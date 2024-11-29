@@ -1,9 +1,7 @@
 import random
-import numpy as np
 from typing import List
 from sympy import randprime
 from typing import Tuple
-
 
 class GroupElement:
     def __init__(self, value: int, modulus: int):
@@ -30,15 +28,16 @@ def generate_group(sec_param) -> Tuple[int, int]:
     """
     p = get_large_prime(sec_param)
     q = get_group_generator(p)
-    return p,q
+    return p, q
 
 
-def get_large_prime(bits:int):
+def get_large_prime(bits: int):
     """
     outputs a large prime number with specified bit size
     bits = sec_param grom generate_group
     """
-    return randprime(2**(bits-1), 2**bits) # random prime number in that range
+    return randprime(2 ** (bits - 1), 2 ** bits)  # random prime number in that range
+
 
 def get_group_generator(p: int):
     """
@@ -49,21 +48,6 @@ def get_group_generator(p: int):
             return g
     raise ValueError("No generator found")
 
-def get_random_generator(group):
-    return group.randomGen()
-
-def get_modulus(element: int, modulus: int) -> int:
-    """
-    Returns the modulus of the modular expression.
-
-    Args:
-        element (int): Group element in modular arithmetic.
-        modulus (int): Modulus of the group.
-
-    Returns:
-        int: The modulus of the modular expression.
-    """
-    return modulus
 
 def reduce_vector_mod(vector: List[int], mod: int) -> List[int]:
     """Reduces all elements of a vector modulo mod
@@ -80,31 +64,10 @@ def reduce_vector_mod(vector: List[int], mod: int) -> List[int]:
         reduced.append(vector[i] % mod)
     return reduced
 
+# generate a cryptographically secure random number that is modulo l
 def get_random_from_Zl(l: int) -> int:
     """Returns a cryptographically secure random number modulo l."""
     return random.SystemRandom().randrange(1, l)
-
-def inner_product(a: List[int], b: List[int]) -> int:
-    """
-    Computes the inner product of two vectors.
-
-    Args:
-        a (List[int]): First vector.
-        b (List[int]): Second vector.
-
-    Returns:
-        int: Inner product of the two vectors.
-    """
-    if len(a) != len(b):
-        raise ValueError("Vector size mismatch")
-    return sum(x * y for x, y in zip(a, b))
-
-
-def inner_product_modulo(a: List[int], b: List[int], mod: int) -> int:
-    """Computes the inner product of two vectors modulo mod."""
-    if len(a) != len(b):
-        raise ValueError("Vector size mismatch")
-    return sum((x * y) % mod for x, y in zip(a, b)) % mod
 
 def inner_product_group_vector(a: List[GroupElement], b: List[int]) -> int:
     """
@@ -122,7 +85,7 @@ def inner_product_group_vector(a: List[GroupElement], b: List[int]) -> int:
     """
     if len(a) != len(b):
         raise ValueError("Vector size mismatch!")
-    
+
     # Compute the inner product
     inner = sum(get_int(element) * b[i] for i, element in enumerate(a))
     return inner
@@ -144,20 +107,57 @@ def get_int(element):
     else:
         raise ValueError(f"Unexpected type in get_int: {type(element)} - Value: {element}")
 
+def discrete_log(a: int, b: int, mod: int, limit: int = 100000) -> int:
+    """
+    Computes the discrete logarithm: finds the smallest integer `i` such that (a^i) % mod == b.
 
+    Args:
+        a (int): The base of the exponentiation (generator of the group).
+        b (int): The target value (result of the exponentiation modulo `mod`).
+        mod (int): The modulus of the group (prime number).
+        limit (int, optional): The maximum number of iterations to search for `i`. Defaults to 100000.
 
-
-def discrete_log(a:int, b:int, mod:int, limit:int = 100000) -> int:
-    for i in range(limit): # to limit the search 
+    Returns:
+        int: The discrete logarithm `i` if found, or None if no such `i` exists within the limit.
+    """
+    for i in range(limit):  # Iterate up to the limit to search for the solution
+        # Compute a^i % mod and check if it equals b
         if pow(a, i, mod) == b:
-            return i
-    return None
+            return i  # Return the solution if found
+    return None  # Return None if no solution is found within the limit
+# Extracts the i-th bit from a number
+def int_bit(num, i):
+    """
+    Extracts the i-th bit (0-indexed) from the binary representation of a given integer.
 
-def sample_random_matrix_mod(size: tuple, mod: int) -> np.ndarray:
-    """Generates a random matrix with elements modulo mod."""
-    return np.random.randint(low=0, high=mod, size=size, dtype=np.int64)
+    Args:
+        num (int): The integer whose bit is to be extracted.
+        i (int): The index of the bit to extract (0 = least significant bit).
 
+    Returns:
+        int: The value of the i-th bit (either 0 or 1).
+    """
+    return (num >> i) & 1  # Right-shift `num` by `i` bits and isolate the least significant bit
 
-def multiply_matrices_mod(A: np.ndarray, B: np.ndarray, mod: int) -> np.ndarray:
-    """Multiplies two matrices modulo mod."""
-    return np.dot(A, B) % mod
+def blood_type_compatibility_formula(input_alice, input_bob):
+    """
+    Computes blood type compatibility between Alice and Bob using a Boolean formula.
+
+    Args:
+        input_alice (int): Encoded input representing Alice's blood type.
+        input_bob (int): Encoded input representing Bob's blood type.
+
+    Returns:
+        int: 1 if Alice and Bob are compatible, 0 otherwise.
+    """
+    # Extract the individual bits of Alice's input
+    x2, x1, x0 = int_bit(input_alice, 2), int_bit(input_alice, 1), int_bit(input_alice, 0)
+
+    # Extract the individual bits of Bob's input
+    y2, y1, y0 = int_bit(input_bob, 2), int_bit(input_bob, 1), int_bit(input_bob, 0)
+
+    # Boolean compatibility formula:
+    real_result = (1 ^ (y0 & (1 ^ x0))) & (1 ^ (y1 & (1 ^ x1))) & (1 ^ (y2 & (1 ^ x2)))
+
+    return real_result  # Return 1 (compatible) or 0 (not compatible)
+

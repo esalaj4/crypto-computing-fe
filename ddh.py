@@ -1,17 +1,11 @@
-from typing import Dict, List, Union
-import numpy as np
-import random
-import charm
-from typing import Tuple
-from sympy import randprime
+from typing import Dict, List, Union, Tuple
 from helperFunction import *
-
 
 IntegerGroupElement = Union[GroupElement, int]
 
-def set_up(security_parameter: int, vector_length: int) -> Tuple[Dict[str, object], List[int]]: # type: ignore
+def set_up(security_parameter: int, vector_length: int) -> Tuple[Dict[str, object], List[int]]:  # type: ignore
     """
-     Samples an integer Schnorr group of order p, where p is a prime number of
+     Samples an integer group of order p, where p is a prime number of
     bit-size equal to security_parameter. Returns master public key and master secret
     key as vectors of group elements.
     """
@@ -42,12 +36,12 @@ def encrypt(mpk: dict, x: List[int]) -> Dict[str, List[IntegerGroupElement]]:
     """
     if len(x) > len(mpk['h']):
         raise ValueError("Vector x is too long for the given master public key.")
-    
+
     # Generate random r in [1, p-1]
     p = mpk['group']['p']
     g = mpk['group']['g']  # Fix: Access g correctly
     r = random.randint(1, p - 1)
-    
+
     # Compute ct_0 = g^r
     ct_0 = g ** r
 
@@ -56,9 +50,10 @@ def encrypt(mpk: dict, x: List[int]) -> Dict[str, List[IntegerGroupElement]]:
 
     # Compute ct[i] = h[i]^r * g^x[i]
     ct = [(mpk['h'][i] ** r) * (g ** x[i]) for i in range(len(x))]
-    
+
     ciphertext = {'ct0': ct_0, 'ct': ct}
     return ciphertext
+
 
 def get_functional_key(mpk: dict, msk: List[IntegerGroupElement], y: List[int]) -> int:
     """Derives functional key for calculating inner product with vector y
@@ -79,12 +74,13 @@ def get_functional_key(mpk: dict, msk: List[IntegerGroupElement], y: List[int]) 
     y = reduce_vector_mod(y, mpk['group']['p'])
     return inner_product_group_vector(msk, y)
 
+
 def decrypt(
-    mpk: dict,
-    ciphertext: Dict[str, List[GroupElement]],
-    sk_y: int,
-    y: List[int],
-    limit: int,
+        mpk: dict,
+        ciphertext: Dict[str, List[GroupElement]],
+        sk_y: int,
+        y: List[int],
+        limit: int,
 ) -> int:
     """
     Returns the inner product of vector y and vector x encrypted in the ciphertext
@@ -103,7 +99,7 @@ def decrypt(
     """
     # Extract components from ciphertext
     ct_0 = ciphertext['ct0']  # ct_0 = g^r
-    ct = ciphertext['ct']     # ct[i] = h[i]^r * g^x[i]
+    ct = ciphertext['ct']  # ct[i] = h[i]^r * g^x[i]
 
     # Reduce vector y modulo p
     y = reduce_vector_mod(y, mpk['group']['p'])
@@ -114,11 +110,10 @@ def decrypt(
     # Compute the product of all t[i] modulo the group modulus
     product = t[0]
     for ti in t[1:]:
-        product *= ti  # Ensure this is handled by GroupElement.__mul__
-    
+        product *= ti
+
     if not isinstance(product, GroupElement):
         raise ValueError(f"Product is not a GroupElement: {type(product)}")
-
 
     # Compute intermediate value: product / ct_0^sk_y (mod group modulus)
     inverse_ct_0_sk_y = ct_0 ** (-sk_y)  # Modular inversion using exponentiation
@@ -128,9 +123,6 @@ def decrypt(
     intermediate = product * inverse_ct_0_sk_y
     if not isinstance(intermediate, GroupElement):
         raise ValueError("Intermediate value is not a GroupElement.")
-    # Add this debug print before get_int(intermediate)
-    print("Type of intermediate:", type(intermediate))
-    print("Value of intermediate:", intermediate)
 
     # Extract the integer representation of the intermediate result
     pi = get_int(intermediate)
@@ -142,24 +134,54 @@ def decrypt(
     inner_prod = discrete_log(g, pi, mpk['group']['p'], limit)
     return inner_prod
 
+## Expand the bloodtype compatiblity function
+def process_input(input_alice: int, input_bob: int) -> Tuple[List[int], List[int]]:
+    """
+    Processes the inputs for Alice and Bob, encoding them into feature vectors.
+
+    Args:
+        input_alice (int): Input for Alice.
+        input_bob (int): Input for Bob.
+
+    Returns:
+        Tuple[List[int], List[int]]: Two lists representing the encoded vectors for Alice and Bob.
+    """
+    # Encode the input for Alice
+    x2, x1, x0 = int_bit(input_alice, 2), int_bit(input_alice, 1), int_bit(input_alice, 0)
+
+    # Encode the input for Bob
+    y2, y1, y0 = int_bit(input_bob, 2), int_bit(input_bob, 1), int_bit(input_bob, 0)
+
+    # Construct the feature vectors
+    x = [1, -(~x2), -(~x1), (~x1) * (~x2), -(~x0), (~x0) * (~x2), (~x0) * (~x1), -(~x0) * (~x1) * (~x2)]
+    y = [1, y2, y1, y1 * y2, y0, y0 * y2, y0 * y1, y0 * y1 * y2]
+
+    return x, y
+
 
 def __main__():
-        # Example group and encryption setup
-    print("starting")
+    # Example group and encryption setup
+    print("******** FUNCTIONAL ENCRYPTION ********")
     security_parameter = 128
-    vector_length = 3
+    vector_length = 8
 
     mpk, msk = set_up(security_parameter, vector_length)
 
-    x = [1, 2, 3]  # Encrypted vector
-    y = [3, 4, 5]  # Decryption vector
+    test_cases = [
+        (0, 0), (1, 0), (2, 1), (3, 7),
+        (4, 5), (7, 2), (6, 6), (5, 4)
+    ]
 
-    ciphertext = encrypt(mpk, x)
-    sk_y = get_functional_key(mpk, msk, y)
-
-    # Decrypt
-    result = decrypt(mpk, ciphertext, sk_y, y, limit=100)
-    print("Decrypted Inner Product:", result)
+    for alice_input, bob_input in test_cases:
+        print(f"Testing Alice: {alice_input}, Bob: {bob_input}")
+        alice_new, bob_new = process_input(alice_input,bob_input)
+        ciphertext = encrypt(mpk, alice_new)
+        sk_y = get_functional_key(mpk, msk, bob_new)
+        result = decrypt(mpk, ciphertext, sk_y, bob_new, limit=1000)
+        result = result % 2
+        # Compare the output of the protocol with the output computed using the boolean formula
+        assert result == blood_type_compatibility_formula(alice_input, bob_input), f"Test failed for Alice: {alice_input}, Bob: {bob_input}"
+    print("All test cases passed!")
 
 if __name__ == "__main__":
     __main__()

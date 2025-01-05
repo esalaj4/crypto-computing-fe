@@ -19,6 +19,23 @@ class GroupElement:
     def __repr__(self):
         return f"GroupElement({self.value}, mod={self.modulus})"
 
+    def __truediv__(self, other):
+        if isinstance(other, GroupElement) and self.modulus == other.modulus:
+            # Division is handled by multiplying by the modular inverse
+            return self * other.inverse()
+        raise ValueError("Incompatible group elements for division.")
+
+    def inverse(self):
+        """Computes the modular inverse of the group element."""
+        return GroupElement(pow(self.value, self.modulus - 2, self.modulus), self.modulus)
+
+
+def add_vectors_mod(a: List[int], b: List[int], mod: int) -> List[int]:
+    if len(a) != len(b):
+        raise ValueError("Wrong size")
+    n = len(a)
+    out = [(a[i] + b[i]) % mod for i in range(n)]
+    return out
 
 def generate_group(sec_param) -> Tuple[int, int]:
     """
@@ -29,6 +46,16 @@ def generate_group(sec_param) -> Tuple[int, int]:
     p = get_large_prime(sec_param)
     q = get_group_generator(p)
     return p, q
+
+def generate_group_fully_secured(sec_param) -> Tuple[int, int, int]:
+    """
+    Generates a Schnorr-like group (Z_p*) where p is a prime of size `sec_param`.
+    sec_param: int
+    output: (p, g1, g2) = (int, int, int), a tuple where p is a prime and g1, g2 are two distinct group generators
+    """
+    p = get_large_prime(sec_param)  # Generate a large prime number p
+    g1, g2 = get_two_distinct_generators(p)  # Get two distinct generators for Z_p*
+    return p, g1, g2  # Return the prime p and two distinct generators g1 and g2
 
 
 def get_large_prime(bits: int):
@@ -48,6 +75,30 @@ def get_group_generator(p: int):
             return g
     raise ValueError("No generator found")
 
+
+def get_two_distinct_generators(p: int) -> (int, int):
+    """
+    Generates two distinct random generators for the group Z_p*.
+    p: int
+        The prime number defining the group Z_p*.
+    Returns:
+        (int, int): Two distinct random generators.
+    """
+    g1 = get_group_generator(p)  # Generate the first generator
+    candidates = []  # List to store potential generators
+
+    # Try to find a second distinct generator
+    for g in range(2, p):
+        if pow(g, (p - 1) // 2, p) != 1 and g != g1:  # Ensure it's distinct and a generator
+            candidates.append(g)
+            if len(candidates) > 0:
+                break  # Stop after finding a second generator
+
+    if len(candidates) > 0:
+        g2 = candidates[0]
+        return g1, g2  # Return the two distinct generators
+    else:
+        raise ValueError("Unable to find two distinct generators.")
 
 def reduce_vector_mod(vector: List[int], mod: int) -> List[int]:
     """Reduces all elements of a vector modulo mod
@@ -90,6 +141,12 @@ def inner_product_group_vector(a: List[GroupElement], b: List[int]) -> int:
     inner = sum(get_int(element) * b[i] for i, element in enumerate(a))
     return inner
 
+def inner_product(a: List[int], b: List[int]) -> int:
+    if len(a) != len(b):
+        raise ValueError("Vector size mismatch!")
+    n = len(a)
+    return sum([a[i] * b[i] for i in range(n)])
+
 def get_int(element):
     """
     Retrieves the integer value of a group element or returns the integer itself.
@@ -106,6 +163,7 @@ def get_int(element):
         return element
     else:
         raise ValueError(f"Unexpected type in get_int: {type(element)} - Value: {element}")
+
 
 def discrete_log(a: int, b: int, mod: int, limit: int = 100000) -> int:
     """
@@ -160,4 +218,3 @@ def blood_type_compatibility_formula(input_alice, input_bob):
     real_result = (1 ^ (y0 & (1 ^ x0))) & (1 ^ (y1 & (1 ^ x1))) & (1 ^ (y2 & (1 ^ x2)))
 
     return real_result  # Return 1 (compatible) or 0 (not compatible)
-

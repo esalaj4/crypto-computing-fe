@@ -37,13 +37,32 @@ def decrypt(mpk: Dict, func_key: Dict, ciphertext: Dict, y: List[int], limit: in
     )
     return discrete_log(get_int(mpk['gen1']), get_int(intermediate), mpk['p'], limit)
 
-# Example
-x = [1, 4, 6, 3, 5]
-y = [1, 2, 1, 9, 1]
-mpk, msk = set_up(1024, len(x))
-ciphertext = encrypt(mpk, x)
-func_key = get_functional_key(mpk, msk, y)
-final_result = decrypt(mpk, func_key, ciphertext, y, 200)
-print(final_result)
+def process_input(input_alice: int, input_bob: int) -> Tuple[List[int], List[int]]:
+    """
+    Encodes the inputs for Alice and Bob into feature vectors.
+    """
+    x2, x1, x0 = int_bit(input_alice, 2), int_bit(input_alice, 1), int_bit(input_alice, 0)
+    y2, y1, y0 = int_bit(input_bob, 2), int_bit(input_bob, 1), int_bit(input_bob, 0)
+
+    # Construct feature vectors for Alice and Bob
+    x = [1, -(~x2), -(~x1), (~x1) * (~x2), -(~x0), (~x0) * (~x2), (~x0) * (~x1), -(~x0) * (~x1) * (~x2)]
+    y = [1, y2, y1, y1 * y2, y0, y0 * y2, y0 * y1, y0 * y1 * y2]
+
+    return x, y
+
+test_cases = [
+    (0, 0), (1, 0), (2, 1), (3, 7),
+    (4, 5), (7, 2), (6, 6), (5, 4)]
 
 
+for alice_input, bob_input in test_cases:
+    print(f"Testing Alice: {alice_input}, Bob: {bob_input}")
+    alice_new, bob_new = process_input(alice_input, bob_input)
+    mpk, msk = set_up(1024, len(alice_new))
+    ciphertext = encrypt(mpk,alice_new)
+    func_key = get_functional_key(mpk, msk, bob_new)
+    final_result = decrypt(mpk, func_key, ciphertext, bob_new, 200)
+    result = result % 2
+        # Compare the output with the computed boolean formula
+    assert result == blood_type_compatibility_formula(alice_input, bob_input), f"Test failed for Alice: {alice_input}, Bob: {bob_input}"
+    print("All test cases passed!")
